@@ -142,7 +142,7 @@ export default function Home() {
             {/* Right — Text */}
             <AnimateOnScroll animation="fade-up" delay={150}>
               <div>
-                <h2 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold text-white italic leading-tight tracking-tight mb-8">
+                <h2 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold text-white leading-tight tracking-tight mb-8">
                   ATREVES-TE?
                 </h2>
                 <p className="text-white/70 text-lg sm:text-xl leading-relaxed mb-8 max-w-lg">
@@ -262,7 +262,7 @@ function FaqSection() {
             <span className="inline-block px-5 py-2 text-xs uppercase tracking-[0.3em] text-white/60 font-medium border border-white/10 rounded-full mb-6">
               Tudo o que precisas de saber:
             </span>
-            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-white italic tracking-tight">
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight">
               Perguntas Essenciais:
             </h2>
           </div>
