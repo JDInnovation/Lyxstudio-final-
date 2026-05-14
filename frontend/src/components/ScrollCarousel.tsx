@@ -91,7 +91,7 @@ export default function ScrollCarousel({ studioName, items, direction }: ScrollC
       <section className="py-16 bg-[#0a0a0a]">
         {/* Header */}
         <div className="px-5 mb-6">
-          <h2 className="font-display text-2xl font-bold text-white italic mb-4">
+          <h2 className="font-display text-2xl font-bold text-white mb-4">
             {studioName} Studio
           </h2>
           <div className="flex items-center justify-between">
@@ -154,7 +154,7 @@ export default function ScrollCarousel({ studioName, items, direction }: ScrollC
         {/* Header */}
         <div className="max-w-7xl mx-auto w-full px-6 sm:px-10 mb-10">
           <div className="flex items-center gap-6">
-            <h2 className="font-display text-3xl sm:text-4xl font-bold text-white italic whitespace-nowrap">
+            <h2 className="font-display text-3xl sm:text-4xl font-bold text-white whitespace-nowrap">
               {studioName} Studio
             </h2>
             <div className="flex-1 h-[2px] bg-white/10 relative overflow-hidden">
