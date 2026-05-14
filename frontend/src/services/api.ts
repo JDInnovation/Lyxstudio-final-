@@ -154,3 +154,27 @@ export const sendEmail = (data: { to: string; subject: string; body: string }, t
     body: JSON.stringify(data),
     headers: authHeaders(token),
   });
+
+// ---- Studio Images ----
+export interface StudioImage {
+  id: string;
+  url: string;
+  order: number;
+  created_at: string;
+}
+
+export const getStudioImages = (studioId: string) =>
+  request<StudioImage[]>(`/studios/${encodeURIComponent(studioId)}/images`);
+
+export const uploadStudioImage = (studioId: string, dataUrl: string, token: string) =>
+  request<StudioImage>(`/studios/${encodeURIComponent(studioId)}/images`, {
+    method: 'POST',
+    body: JSON.stringify({ data: dataUrl }),
+    headers: authHeaders(token),
+  });
+
+export const deleteStudioImage = (studioId: string, imageId: string, token: string) =>
+  request<{ message: string }>(`/studios/${encodeURIComponent(studioId)}/images/${encodeURIComponent(imageId)}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });

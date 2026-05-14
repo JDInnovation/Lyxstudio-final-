@@ -9,6 +9,7 @@ import settingsRouter from './routes/settings';
 import bookingsRouter from './routes/bookings';
 import availabilityRouter from './routes/availability';
 import adminRouter from './routes/admin';
+import studiosRouter from './routes/studios';
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // Force HTTPS in production (behind reverse proxy / Passenger)
 if (isProduction) {
@@ -58,6 +59,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/bookings', bookingsRouter);
 app.use('/api/availability', availabilityRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/studios', studiosRouter);
 
 // --- Production: serve frontend ---
 if (isProduction) {

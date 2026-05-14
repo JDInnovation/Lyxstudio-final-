@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getSettings } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { getSettings, getStudioImages, uploadStudioImage, deleteStudioImage, type StudioImage } from '../services/api';
 import { useToast } from '../components/Toast';
 import { pushAudit } from './auditStore';
 
@@ -37,8 +37,164 @@ const STUDIOS_DEFAULT = [
 
 const inputCls = 'w-full px-3 py-2.5 bg-[#161616] border border-white/[0.06] rounded-xl text-sm text-white focus:border-white/30 focus:ring-1 focus:ring-white/10 outline-none transition-all placeholder-[#444]';
 
+// ── Image helpers ────────────────────────────────────────────────────────────
+const MAX_IMAGE_DIM = 1600;
+const JPEG_QUALITY = 0.82;
+
+async function fileToResizedDataUrl(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Ficheiro não é uma imagem.');
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Erro ao ler ficheiro.'));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error('Imagem inválida.'));
+    i.src = dataUrl;
+  });
+  let { width, height } = img;
+  if (width > MAX_IMAGE_DIM || height > MAX_IMAGE_DIM) {
+    const scale = Math.min(MAX_IMAGE_DIM / width, MAX_IMAGE_DIM / height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas não suportado.');
+  ctx.drawImage(img, 0, 0, width, height);
+  // Always export as JPEG to keep payload small
+  return canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+}
+
+// ── Studio Image Manager ─────────────────────────────────────────────────────
+function StudioImageManager({ studioId, token }: { studioId: string; token: string }) {
+  const { addToast } = useToast();
+  const [images, setImages] = useState<StudioImage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const list = await getStudioImages(studioId);
+      setImages(list);
+    } catch (err: any) {
+      addToast(err?.message || 'Erro ao carregar imagens.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studioId]);
+
+  const onFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    let success = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const dataUrl = await fileToResizedDataUrl(file);
+        const created = await uploadStudioImage(studioId, dataUrl, token);
+        setImages((prev) => [...prev, created]);
+        success++;
+      } catch (err: any) {
+        addToast(`${file.name}: ${err?.message || 'Erro'}`, 'error');
+      }
+    }
+    if (success > 0) {
+      pushAudit('Imagens adicionadas', `${success} imagem(ns) em ${studioId}`, 'Configurações', 'success');
+      addToast(`${success} imagem(ns) carregada(s)!`, 'success');
+    }
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const remove = async (id: string) => {
+    if (!window.confirm('Eliminar esta imagem?')) return;
+    setDeletingId(id);
+    try {
+      await deleteStudioImage(studioId, id, token);
+      setImages((prev) => prev.filter((im) => im.id !== id));
+      pushAudit('Imagem removida', `${id.slice(0, 8)} em ${studioId}`, 'Configurações', 'warning');
+      addToast('Imagem removida.', 'success');
+    } catch (err: any) {
+      addToast(err?.message || 'Erro ao remover imagem.', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-[11px] text-[#555] uppercase tracking-wider">Imagens ({images.length})</label>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="text-[11px] px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/80 hover:text-white transition-colors disabled:opacity-50"
+        >
+          {uploading ? 'A carregar...' : '+ Adicionar'}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => onFiles(e.target.files)}
+        />
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-3 gap-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="aspect-square rounded-lg bg-white/[0.03] animate-pulse" />
+          ))}
+        </div>
+      ) : images.length === 0 ? (
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="border border-dashed border-white/[0.08] rounded-xl p-4 text-center text-xs text-[#555] cursor-pointer hover:border-white/[0.15] hover:text-[#888] transition-colors"
+        >
+          Sem imagens. Clica para adicionar.
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {images.map((im) => (
+            <div key={im.id} className="relative group aspect-square rounded-lg overflow-hidden bg-[#0a0a0a] border border-white/[0.06]">
+              <img src={im.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+              <button
+                type="button"
+                onClick={() => remove(im.id)}
+                disabled={deletingId === im.id}
+                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 backdrop-blur-sm text-white/90 opacity-0 group-hover:opacity-100 hover:bg-red-500/80 transition-all flex items-center justify-center text-xs disabled:opacity-50"
+                title="Eliminar"
+              >
+                {deletingId === im.id ? '…' : '×'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-[#444] mt-2">Imagens redimensionadas automaticamente (máx. {MAX_IMAGE_DIM}px). JPEG, formatos aceites: PNG/JPG/WEBP.</p>
+    </div>
+  );
+}
+
 // ── Studio card ──────────────────────────────────────────────────────────────
-function StudioCard({ studio, onSave }: { studio: typeof STUDIOS_DEFAULT[0]; onSave: (s: typeof STUDIOS_DEFAULT[0]) => void }) {
+function StudioCard({ studio, onSave, token }: { studio: typeof STUDIOS_DEFAULT[0]; onSave: (s: typeof STUDIOS_DEFAULT[0]) => void; token: string }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ ...studio });
   const [amenityInput, setAmenityInput] = useState('');
@@ -154,6 +310,10 @@ function StudioCard({ studio, onSave }: { studio: typeof STUDIOS_DEFAULT[0]; onS
             </div>
           </>
         )}
+
+        <div className="border-t border-white/[0.06] pt-4">
+          <StudioImageManager studioId={studio.id} token={token} />
+        </div>
       </div>
     </div>
   );
@@ -261,7 +421,7 @@ export default function Settings({ token }: Props) {
       {tab === 'studios' && (
         <div className="grid md:grid-cols-3 gap-5">
           {studios.map((s) => (
-            <StudioCard key={s.id} studio={s} onSave={updateStudio} />
+            <StudioCard key={s.id} studio={s} onSave={updateStudio} token={token} />
           ))}
         </div>
       )}
